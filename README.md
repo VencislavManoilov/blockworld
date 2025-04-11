@@ -1,4 +1,4 @@
-# Minecraft Clone
+# Blockworld
 
 A simple Minecraft-inspired game created as a school project using C++ and SFML graphics library.
 
