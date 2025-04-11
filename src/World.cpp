@@ -155,8 +155,8 @@ void World::generateTerrain(Chunk& chunk, int chunkX, int chunkY) {
     for (int x = 0; x < Chunk::SIZE; ++x) {
         // Generate height using sine wave and noise
         double worldX = (chunkX * Chunk::SIZE + x) * TERRAIN_SCALE;
-        double baseHeight = 10.0; // Lower base height since we're starting from top
-        double heightVariation = 5.0; // Reduced height variation
+        double baseHeight = Chunk::SIZE - 10.0; // Higher base height since we're starting from bottom
+        double heightVariation = 5.0;
         
         // Combine sine wave with noise for natural-looking terrain
         double heightNoise = perlin.noise(worldX * 0.5, 0) * heightVariation;
@@ -169,18 +169,18 @@ void World::generateTerrain(Chunk& chunk, int chunkX, int chunkY) {
             // Default to air
             chunk.blocks[x][y] = Block(BlockType::Air);
             
-            if (worldY < surfaceHeight) {
+            if (worldY > surfaceHeight) {
                 // Surface layer - grass
-                if (worldY == surfaceHeight - 1) {
+                if (worldY == surfaceHeight + 1) {
                     chunk.blocks[x][y] = Block(BlockType::Grass);
                 }
                 // Dirt layer (3 blocks)
-                else if (worldY >= surfaceHeight - 4) {
+                else if (worldY <= surfaceHeight + 4) {
                     chunk.blocks[x][y] = Block(BlockType::Dirt);
                 }
                 // Deep underground
                 else {
-                    if (worldY < surfaceHeight - 20 && diamond_dist(gen) > 0.99) {
+                    if (worldY > surfaceHeight + 20 && diamond_dist(gen) > 0.99) {
                         chunk.blocks[x][y] = Block(BlockType::Diamond);
                     } else {
                         chunk.blocks[x][y] = Block(BlockType::Stone);
