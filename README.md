@@ -28,8 +28,8 @@ sudo apt-get install libsfml-dev cmake g++
 
 2. Clone the repository:
 ```bash
-git clone <repository-url>
-cd minecraft
+git clone https://github.com/VencislavManoilov/blockworld.git
+cd blockworld
 ```
 
 3. Build the project:
@@ -42,7 +42,7 @@ make
 
 4. Run the game:
 ```bash
-./MinecraftClone
+./Blockworld
 ```
 
 ### Windows

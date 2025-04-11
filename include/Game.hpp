@@ -24,5 +24,5 @@ private:
     
     static constexpr int WINDOW_WIDTH = 1280;
     static constexpr int WINDOW_HEIGHT = 720;
-    static constexpr char WINDOW_TITLE[] = "2D Minecraft";
+    static constexpr char WINDOW_TITLE[] = "Blockworld";
 };
