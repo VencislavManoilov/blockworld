@@ -180,38 +180,86 @@ void World::generateTerrain(Chunk& chunk, int chunkX, int chunkY) {
         for (int y = 0; y < Chunk::SIZE; ++y) {
             int worldY = chunkY * Chunk::SIZE + y;
             
-            // Default to air
-            chunk.blocks[x][y] = Block(BlockType::Air);
-            
-            if (worldY > surfaceHeight) {
+            // Default to air only above the surface height
+            if (worldY <= surfaceHeight) {
+                chunk.blocks[x][y] = Block(BlockType::Air);
+            }
+            else if (worldY == surfaceHeight + 1) {
                 // Surface layer - grass
-                if (worldY == surfaceHeight + 1) {
-                    chunk.blocks[x][y] = Block(BlockType::Grass);
-                    
-                    // Consider placing a tree on this grass block
-                    if (tree_dist(gen) < 0.05) {  // 5% chance for a tree
-                        treePlacements.push_back(std::make_pair(x, y));
-                    }
+                chunk.blocks[x][y] = Block(BlockType::Grass);
+                
+                // Consider placing a tree on this grass block
+                if (tree_dist(gen) < 0.05) {  // 5% chance for a tree
+                    treePlacements.push_back(std::make_pair(x, y));
                 }
-                // Dirt layer (3-5 blocks with variable depth)
-                else if (worldY <= surfaceHeight + 3 + static_cast<int>(perlin.noise(worldX * 5.0, worldY * 5.0) * 2.0)) {
-                    chunk.blocks[x][y] = Block(BlockType::Dirt);
+            }
+            // Dirt layer (3-5 blocks with variable depth)
+            else if (worldY <= surfaceHeight + 3 + static_cast<int>(perlin.noise(worldX * 5.0, worldY * 5.0) * 2.0)) {
+                chunk.blocks[x][y] = Block(BlockType::Dirt);
+            }
+            // Deep underground - default is stone, with air pockets for caves
+            else {
+                // Default to stone for everything below dirt
+                Block blockType = Block(BlockType::Stone);
+                
+                // Generate caves with improved parameters
+                double worldYScaled = worldY * 0.1;
+                double caveX = worldX * 0.09; // Slightly tuned for better cave shapes
+                double caveY = worldYScaled * 0.09;
+                
+                // Use multiple noise functions for more natural cave shapes
+                double caveNoise1 = perlin.noise(caveX, caveY);
+                double caveNoise2 = perlin.noise(caveX * 2.1, caveY * 2.1) * 0.5;
+                
+                // Calculate distance from surface for depth-based cave distribution
+                int depthFromSurface = worldY - surfaceHeight;
+                
+                // Cave threshold - higher means fewer caves (air pockets)
+                double caveDensityThreshold = 0.3;
+                
+                // Cave frequency by depth - most caves in the middle layers
+                // Fewer caves near surface and at extreme depths
+                double depthFactor = 0.0;
+                
+                // Very few caves near surface (protect 8 blocks below surface)
+                if (depthFromSurface < 8) {
+                    caveDensityThreshold = 0.8; // Almost no caves
                 }
-                // Deep underground
+                // Increase cave frequency in middle depths
+                else if (depthFromSurface < 25) {
+                    depthFactor = (depthFromSurface - 8) / 17.0; // Gradually introduce more caves
+                    caveDensityThreshold = 0.4 - depthFactor * 0.2;
+                }
+                // Most caves in this band
+                else if (depthFromSurface < 45) {
+                    caveDensityThreshold = 0.3; // Moderate amount of caves
+                }
+                // Reduce caves at extreme depths
                 else {
-                    // Add cave systems (air pockets)
-                    double caveNoise = perlin.noise(worldX * 0.1, worldY * 0.1);
-                    double caveDensity = 0.3; // Higher = fewer caves
-                    
-                    if (caveNoise > caveDensity) {
-                        if (worldY > surfaceHeight + 20 && diamond_dist(gen) > 0.98) {
-                            chunk.blocks[x][y] = Block(BlockType::Diamond);
-                        } else {
-                            chunk.blocks[x][y] = Block(BlockType::Stone);
-                        }
-                    }
-                    // Otherwise leave as air (cave)
+                    caveDensityThreshold = 0.3 + ((depthFromSurface - 45) / 50.0) * 0.4;
                 }
+                
+                // Calculate combined cave noise
+                double combinedCaveNoise = caveNoise1 + caveNoise2;
+                
+                // Occasionally create large cave chambers
+                if (diamond_dist(gen) > 0.998 && depthFromSurface > 20 && depthFromSurface < 50) {
+                    // Create a chamber by locally reducing the threshold
+                    caveDensityThreshold -= 0.15;
+                }
+                
+                // FIX: Reversed the condition - now if noise is ABOVE threshold, create a cave
+                if (combinedCaveNoise > caveDensityThreshold) {
+                    // Create an air pocket (cave)
+                    blockType = Block(BlockType::Air);
+                } else {
+                    // Normal stone or occasionally diamonds (rare)
+                    if (worldY > surfaceHeight + 20 && diamond_dist(gen) > 0.98) {
+                        blockType = Block(BlockType::Diamond);
+                    }
+                }
+                
+                chunk.blocks[x][y] = blockType;
             }
         }
     }
