@@ -27,7 +27,8 @@ private:
     void generateTerrain(Chunk& chunk, int chunkX, int chunkY);
     void generateStructures(Chunk& chunk, int chunkX, int chunkY);
     float generateNoise(float x, float y) const;
-    
+    void generateTree(Chunk& chunk, int x, int y);
+
     static constexpr int RENDER_DISTANCE = 2;
     static constexpr int WATER_LEVEL = 60;
     static constexpr int STONE_LEVEL = 40;

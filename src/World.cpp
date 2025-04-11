@@ -151,18 +151,32 @@ void World::generateTerrain(Chunk& chunk, int chunkX, int chunkY) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> diamond_dist(0.0, 1.0);
+    std::uniform_real_distribution<> tree_dist(0.0, 1.0);
+    std::vector<std::pair<int, int>> treePlacements;
 
     for (int x = 0; x < Chunk::SIZE; ++x) {
-        // Generate height using sine wave and noise
+        // Generate height using multiple noise functions for more interesting terrain
         double worldX = (chunkX * Chunk::SIZE + x) * TERRAIN_SCALE;
-        double baseHeight = Chunk::SIZE - 10.0; // Higher base height since we're starting from bottom
-        double heightVariation = 5.0;
+        double baseHeight = Chunk::SIZE - 10.0;
         
-        // Combine sine wave with noise for natural-looking terrain
-        double heightNoise = perlin.noise(worldX * 0.5, 0) * heightVariation;
-        double sineComponent = sin(worldX * 0.2) * heightVariation * 0.5;
+        // Add multiple noise components at different scales for more natural terrain
+        double noiseScale1 = 0.5; // Large-scale terrain features
+        double noiseScale2 = 2.0; // Medium details
+        double noiseScale3 = 5.0; // Small details
+        
+        double heightNoise = perlin.noise(worldX * noiseScale1, 0) * 6.0 +
+                             perlin.noise(worldX * noiseScale2, 0) * 3.0 +
+                             perlin.noise(worldX * noiseScale3, 0) * 1.0;
+                             
+        // Add hills with sine waves of different periods
+        double sineComponent = sin(worldX * 0.2) * 3.0 +
+                               sin(worldX * 0.05) * 5.0;
+                               
         int surfaceHeight = static_cast<int>(baseHeight + heightNoise + sineComponent);
 
+        // Track terrain surface for tree placement
+        int terrainSurfaceY = surfaceHeight + 1;
+        
         for (int y = 0; y < Chunk::SIZE; ++y) {
             int worldY = chunkY * Chunk::SIZE + y;
             
@@ -173,21 +187,75 @@ void World::generateTerrain(Chunk& chunk, int chunkX, int chunkY) {
                 // Surface layer - grass
                 if (worldY == surfaceHeight + 1) {
                     chunk.blocks[x][y] = Block(BlockType::Grass);
+                    
+                    // Consider placing a tree on this grass block
+                    if (tree_dist(gen) < 0.05) {  // 5% chance for a tree
+                        treePlacements.push_back(std::make_pair(x, y));
+                    }
                 }
-                // Dirt layer (3 blocks)
-                else if (worldY <= surfaceHeight + 4) {
+                // Dirt layer (3-5 blocks with variable depth)
+                else if (worldY <= surfaceHeight + 3 + static_cast<int>(perlin.noise(worldX * 5.0, worldY * 5.0) * 2.0)) {
                     chunk.blocks[x][y] = Block(BlockType::Dirt);
                 }
                 // Deep underground
                 else {
-                    if (worldY > surfaceHeight + 20 && diamond_dist(gen) > 0.99) {
-                        chunk.blocks[x][y] = Block(BlockType::Diamond);
-                    } else {
-                        chunk.blocks[x][y] = Block(BlockType::Stone);
+                    // Add cave systems (air pockets)
+                    double caveNoise = perlin.noise(worldX * 0.1, worldY * 0.1);
+                    double caveDensity = 0.3; // Higher = fewer caves
+                    
+                    if (caveNoise > caveDensity) {
+                        if (worldY > surfaceHeight + 20 && diamond_dist(gen) > 0.98) {
+                            chunk.blocks[x][y] = Block(BlockType::Diamond);
+                        } else {
+                            chunk.blocks[x][y] = Block(BlockType::Stone);
+                        }
+                    }
+                    // Otherwise leave as air (cave)
+                }
+            }
+        }
+    }
+    
+    // Generate trees after terrain is complete
+    for (const auto& treePos : treePlacements) {
+        generateTree(chunk, treePos.first, treePos.second);
+    }
+}
+
+void World::generateTree(Chunk& chunk, int x, int y) {
+    // Define tree characteristics
+    const int trunkHeight = 4 + rand() % 3; // 4-6 blocks tall
+    const int leavesRadius = 2;
+    
+    // Generate trunk
+    for (int h = 1; h <= trunkHeight; h++) {
+        if (y - h >= 0) {
+            chunk.blocks[x][y - h] = Block(BlockType::WoodLog);
+        }
+    }
+    
+    // Generate leaves (in a circular pattern)
+    for (int ly = -leavesRadius; ly <= leavesRadius; ly++) {
+        for (int lx = -leavesRadius; lx <= leavesRadius; lx++) {
+            // Create rounded leaf shape
+            if (lx*lx + ly*ly <= leavesRadius*leavesRadius + 1) {
+                int leafX = x + lx;
+                int leafY = y - trunkHeight - 1 + ly;
+                
+                // Check bounds of the chunk
+                if (leafX >= 0 && leafX < Chunk::SIZE && leafY >= 0 && leafY < Chunk::SIZE) {
+                    // Only place leaves where there's air
+                    if (chunk.blocks[leafX][leafY].getType() == BlockType::Air) {
+                        chunk.blocks[leafX][leafY] = Block(BlockType::Leaves);
                     }
                 }
             }
         }
+    }
+    
+    // Generate some extra leaves on top
+    if (y - trunkHeight - 2 >= 0 && x < Chunk::SIZE) {
+        chunk.blocks[x][y - trunkHeight - 2] = Block(BlockType::Leaves);
     }
 }
 
